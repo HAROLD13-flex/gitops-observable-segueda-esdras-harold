@@ -1,6 +1,6 @@
 studentName: "Segueda-Esdras-Harold"
 
-replicaCount: 3
+replicaCount: 2
 
 image:
   repository: harold78/app-harold
