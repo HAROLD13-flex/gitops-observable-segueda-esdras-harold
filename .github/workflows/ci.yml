@@ -41,7 +41,7 @@ jobs:
         run: docker build -t harold78/app-harold:${{ env.IMAGE_TAG }} .
 
       - name: Scanner l'image avec Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: harold78/app-harold:${{ env.IMAGE_TAG }}
           format: table
