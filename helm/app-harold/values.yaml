@@ -4,7 +4,7 @@ replicaCount: 3
 
 image:
   repository: harold78/app-harold
-  tag: "66eae81"
+  tag: "0941721"
   pullPolicy: IfNotPresent
 
 service:
