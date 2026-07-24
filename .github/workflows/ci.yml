@@ -1,0 +1,67 @@
+name: CI/CD Pipeline - GitOps Harold
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt pytest
+      - name: Lancer les tests
+        run: pytest -v
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Valider le chart Helm
+        run: helm lint helm/app-harold
+
+  build-scan-push:
+    needs: [tests, helm-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Définir le tag d'image
+        run: echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+
+      - name: Construire l'image Docker
+        run: docker build -t harold78/app-harold:${{ env.IMAGE_TAG }} .
+
+      - name: Scanner l'image avec Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: harold78/app-harold:${{ env.IMAGE_TAG }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Connexion à Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pousser l'image
+        run: docker push harold78/app-harold:${{ env.IMAGE_TAG }}
+
+      - name: Mettre à jour le chart Helm (déclenche Argo CD)
+        run: |
+          sed -i "s/^\(\s*tag:\).*/\1 \"${IMAGE_TAG}\"/" helm/app-harold/values.yaml
+          git config user.email "ci-bot@gitops-harold.local"
+          git config user.name "CI Bot"
+          git add helm/app-harold/values.yaml
+          git commit -m "ci: mise à jour de l'image vers ${IMAGE_TAG} [skip ci]" || echo "Rien à committer"
+          git push
