@@ -1,7 +1,23 @@
 from flask import Flask
 import socket
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+
+# --- Configuration OpenTelemetry : envoi des traces vers Jaeger (monitoring-harold) ---
+resource = Resource.create({"service.name": "app-harold-segueda"})
+provider = TracerProvider(resource=resource)
+exporter = OTLPSpanExporter(endpoint="192.168.229.163:4317", insecure=True)
+provider.add_span_processor(BatchSpanProcessor(exporter))
+trace.set_tracer_provider(provider)
+
 app = Flask(__name__)
+FlaskInstrumentor().instrument_app(app)
+
 
 @app.route('/')
 def hello_world():
@@ -29,6 +45,12 @@ def hello_world():
     </body>
     </html>
     """
+
+
+@app.route('/health')
+def health():
+    return {"status": "ok"}, 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
